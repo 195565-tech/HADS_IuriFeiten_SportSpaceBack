@@ -1,8 +1,11 @@
 const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
-  const token = req.cookies.session_token || req.headers['authorization'];
-  if (!token) return res.status(401).json({ error: 'Usuário não autenticado' });
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return res.status(401).json({ error: 'Usuário não autenticado' });
+
+  const token = authHeader.split(' ')[1]; // Pega só o token após 'Bearer'
+  if (!token) return res.status(401).json({ error: 'Token inválido' });
 
   try {
     const user = jwt.verify(token, process.env.JWT_SECRET);

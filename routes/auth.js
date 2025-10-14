@@ -36,43 +36,42 @@ try {
 // 🚀 ROTA: CADASTRO (REGISTER)
 // ===================================
 router.post("/register", async (req, res) => {
-try {
- const { nome, email, senha } = req.body;
- if (!nome || !email || !senha) return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
+  try {
+    const { nome, email, senha, user_type } = req.body;
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
+    }
 
- // 1. Verifica se o usuário já existe
- const existingUser = await knex("user_profiles").where({ user_id: email }).first();
- if (existingUser) {
-  return res.status(409).json({ error: "Email já cadastrado." });
- }
+    const existingUser = await knex("user_profiles").where({ user_id: email }).first();
+    if (existingUser) {
+      return res.status(409).json({ error: "Email já cadastrado." });
+    }
 
- // 2. Gera o hash da senha
- const salt = await bcrypt.genSalt(10);
- const passwordHash = await bcrypt.hash(senha, salt);
-  
- // 3. Insere o novo usuário (user_type 'user' por padrão)
- const [newUser] = await knex("user_profiles")
-  .insert({ 
-  user_id: email, 
-  nome: nome,
-  password_hash: passwordHash,
-  user_type: 'user' // Padrão: usuário comum
-  })
-  .returning('*');
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(senha, salt);
 
- // 4. Gera o token e retorna para o frontend (sem cookie)
- const token = generateToken({ user_id: newUser.user_id, user_type: newUser.user_type });
-  
- // Remove o hash da senha antes de enviar ao frontend
- delete newUser.password_hash;
+    // Usa o tipo vindo do front, se válido, senão 'user'
+    const tipo = user_type === 'owner' ? 'owner' : 'user';
 
- // RETORNA O TOKEN NO JSON DA RESPOSTA
- res.status(201).json({ success: true, user: newUser, token });
-} catch (err) {
- console.error(err);
- res.status(500).json({ error: "Erro interno no cadastro" });
-}
+    const [newUser] = await knex("user_profiles")
+      .insert({
+        user_id: email,
+        nome,
+        password_hash: passwordHash,
+        user_type: tipo
+      })
+      .returning('*');
+
+    const token = generateToken({ user_id: newUser.user_id, user_type: newUser.user_type });
+
+    delete newUser.password_hash;
+    res.status(201).json({ success: true, user: newUser, token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro interno no cadastro" });
+  }
 });
+
 
 // Login
 router.post("/login", async (req, res) => {

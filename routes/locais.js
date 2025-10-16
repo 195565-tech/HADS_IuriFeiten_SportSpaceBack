@@ -138,28 +138,50 @@ try {
 });
 
 // Atualizar local (apenas criador do local)
-router.put('/locais/:id', authMiddleware, async (req, res) => {
-try {
- const localId = parseInt(req.params.id);
- if (isNaN(localId)) return res.status(400).json({ error: 'ID inválido' });
- 
- const userId = req.user.user_id;
- const local = await db('locais').where({ id: localId, user_id: userId }).first();
- if (!local) return res.status(404).json({ error: 'Local não encontrado ou sem permissão' });
+router.put('/locais/:id', authMiddleware, upload.array('fotos'), async (req, res) => {
+  try {
+    const localId = parseInt(req.params.id);
+    if (isNaN(localId)) return res.status(400).json({ error: 'ID inválido' });
 
- const updateData = { ...req.body, updated_at: new Date().toISOString() };
- if (updateData.fotos && Array.isArray(updateData.fotos)) {
- updateData.fotos = JSON.stringify(updateData.fotos);
- }
- await db('locais').where({ id: localId }).update(updateData);
+    const userId = req.user.user_id;
+    const local = await db('locais').where({ id: localId, user_id: userId }).first();
+    if (!local) return res.status(404).json({ error: 'Local não encontrado ou sem permissão' });
 
- const updatedLocal = await db('locais').where({ id: localId }).first();
- res.json(updatedLocal);
-} catch (err) {
- console.error(err);
- res.status(500).json({ error: 'Erro ao atualizar local' });
-}
+    const { nome, descricao, endereco, esporte, valorHora, disponibilidade, telefone, fotosExistentes } = req.body;
+
+    let fotos = fotosExistentes ? JSON.parse(fotosExistentes) : [];
+
+    // Fazer upload de novos arquivos enviados
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const url = await uploadToS3(file.buffer, file.mimetype, file.originalname);
+        fotos.push(url);
+      }
+    }
+
+    const updateData = {
+      nome,
+      descricao,
+      endereco,
+      esporte,
+      valor_hora: valorHora,
+      disponibilidade,
+      telefone,
+      fotos: JSON.stringify(fotos),
+      updated_at: new Date().toISOString()
+    };
+
+    await db('locais').where({ id: localId }).update(updateData);
+
+    const updatedLocal = await db('locais').where({ id: localId }).first();
+    res.json(updatedLocal);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar local' });
+  }
 });
+
 
 // Deletar local (apenas criador do local)
 router.delete('/locais/:id', authMiddleware, async (req, res) => {

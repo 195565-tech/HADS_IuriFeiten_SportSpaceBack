@@ -22,10 +22,17 @@ const upload = multer({
 
 /**
  * Middleware para verificar se o usuário é administrador
+ * CORRIGIDO: Mudou de req.user.perfil para req.user.user_type
  */
 const adminMiddleware = (req, res, next) => {
-  if (!req.user || req.user.perfil !== 'admin') {
-    return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem realizar esta ação.' });
+  console.log('Verificando admin:', req.user); // Debug
+  
+  if (!req.user || req.user.user_type !== 'admin') {
+    console.log('Acesso negado. User type:', req.user?.user_type); // Debug
+    return res.status(403).json({ 
+      error: 'Acesso negado. Apenas administradores podem realizar esta ação.',
+      user_type: req.user?.user_type 
+    });
   }
   next();
 };
@@ -66,10 +73,13 @@ async function uploadToS3(fileBuffer, mimetype, originalname) {
  */
 router.get('/locais/pendentes', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    console.log('Buscando locais pendentes...'); // Debug
+    
     const locaisPendentes = await db('locais')
       .where({ status_aprovacao: 'pendente' })
       .orderBy('created_at', 'desc');
     
+    console.log(`Encontrados ${locaisPendentes.length} locais pendentes`); // Debug
     res.json(locaisPendentes);
   } catch (err) {
     console.error('Erro ao buscar locais pendentes:', err);
@@ -206,14 +216,6 @@ router.get('/locais', async (req, res) => {
 
   try {
     let locais;
-    
-    // Se houver usuário autenticado (através do token, se fornecido)
-    // Nota: Este endpoint não usa authMiddleware obrigatório, então req.user pode não existir
-    // Para implementar corretamente, você pode adicionar um middleware opcional de auth
-    
-    // Por simplicidade, vamos retornar apenas locais aprovados para requisições públicas
-    // Se você quiser que proprietários vejam seus próprios locais, 
-    // precisará de uma rota separada ou verificar o token aqui
     
     locais = await db('locais')
       .where({ status_aprovacao: 'aprovado' })

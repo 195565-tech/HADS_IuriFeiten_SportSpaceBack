@@ -1,26 +1,32 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
+
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const locaisRoutes = require('./routes/locais');
+const reservasRoutes = require('./routes/reservas');
+const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
-// CORS - permitir requisições do frontend
 app.use(cors({
   origin: ['https://main.dlm5jb4lw8ys1.amplifyapp.com', 'http://localhost:5173'],
   credentials: true,
 }));
 
-// Middleware para processar JSON
 app.use(express.json());
-app.use(cookieParser());
 
 // Rota de teste
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API funcionando' });
 });
 
-// Rotas de autenticação
-app.use('/api/auth', authRoutes);
+// TODAS as rotas com /api (sem /auth)
+app.use('/api', authRoutes);
+app.use('/api', userRoutes);
+app.use('/api', locaisRoutes);
+app.use('/api', reservasRoutes);
+app.use('/api', notificacoesRoutes);
 
 module.exports = app;

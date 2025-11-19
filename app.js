@@ -22,8 +22,8 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API funcionando' });
 });
 
-// Rotas
-app.use('/api/auth', authRoutes);
+// TODAS as rotas com /api (sem /auth)
+app.use('/api', authRoutes);
 app.use('/api', userRoutes);
 app.use('/api', locaisRoutes);
 app.use('/api', reservasRoutes);

@@ -10,13 +10,20 @@ const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
+app.use(cors({
+  origin: ['https://main.dlm5jb4lw8ys1.amplifyapp.com', 'http://localhost:5173'],
+  credentials: true,
+}));
 
-
-app.use(cors());
 app.use(express.json());
 
+// Rota de teste
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API funcionando' });
+});
+
 // Rotas
-app.use('/api', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api', userRoutes);
 app.use('/api', locaisRoutes);
 app.use('/api', reservasRoutes);

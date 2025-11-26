@@ -89,7 +89,7 @@ router.post('/reservas', authMiddleware, async (req, res) => {
 });
 
 /**
- * ✅ ROTA CORRIGIDA: Listar reservas
+ * ✅ ROTA CORRIGIDA V2: Listar reservas
  * - Admin: vê TODAS as reservas
  * - Owner: vê apenas reservas dos seus locais
  * - User comum: vê apenas suas próprias reservas
@@ -113,25 +113,22 @@ router.get('/reservas', authMiddleware, async (req, res) => {
 
     // ✅ Filtro baseado no tipo de usuário
     if (userType === 'admin') {
-      // Admin vê TODAS as reservas (sem filtro)
+      // Admin vê TODAS as reservas (sem filtro adicional)
+      // Não adiciona nenhum WHERE
     } else if (userType === 'owner') {
       // Owner vê apenas reservas dos seus locais
       if (locais_ids) {
-        // Se veio query param, filtra pelos IDs específicos
-        const ids = locais_ids.split(',').map(id => parseInt(id));
-        query = query.whereIn('reservas.local_id', ids);
-      } else {
-        // Se não veio query param, busca todos os locais do owner
-        const meusLocais = await db('locais')
-          .where({ user_id: userId })
-          .select('id');
-        const meusLocaisIds = meusLocais.map(l => l.id);
-        
-        if (meusLocaisIds.length === 0) {
-          return res.json([]); // Owner sem locais = sem reservas
+        // Se veio locais_ids na query, usa isso
+        const ids = locais_ids.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+        if (ids.length > 0) {
+          query = query.whereIn('reservas.local_id', ids);
+        } else {
+          // Se não tem IDs válidos, retorna vazio
+          return res.json([]);
         }
-        
-        query = query.whereIn('reservas.local_id', meusLocaisIds);
+      } else {
+        // Se não veio locais_ids, filtra pelos locais que pertencem ao owner
+        query = query.where('locais.user_id', userId);
       }
     } else {
       // User comum vê apenas suas próprias reservas
@@ -139,14 +136,17 @@ router.get('/reservas', authMiddleware, async (req, res) => {
     }
 
     const reservas = await query.orderBy('reservas.data_reserva', 'desc');
+    
     res.json(reservas);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao buscar reservas' });
+    console.error('ERRO ao buscar reservas:', err);
+    res.status(500).json({ error: 'Erro ao buscar reservas', details: err.message });
   }
 });
 
-// Alterar reserva
+/**
+ * Alterar reserva
+ */
 router.put('/reservas/:id', authMiddleware, async (req, res) => {
   try {
     const reservaId = parseInt(req.params.id);
@@ -186,12 +186,14 @@ router.put('/reservas/:id', authMiddleware, async (req, res) => {
 
     res.json(updatedReserva);
   } catch (err) {
-    console.error(err);
+    console.error('ERRO ao alterar reserva:', err);
     res.status(500).json({ error: 'Erro ao alterar reserva' });
   }
 });
 
-// Cancelar reserva
+/**
+ * Cancelar reserva
+ */
 router.delete('/reservas/:id', authMiddleware, async (req, res) => {
   try {
     const reservaId = parseInt(req.params.id);
@@ -232,12 +234,14 @@ router.delete('/reservas/:id', authMiddleware, async (req, res) => {
     
     res.json({ message: 'Reserva cancelada com sucesso' });
   } catch (err) {
-    console.error(err);
+    console.error('ERRO ao cancelar reserva:', err);
     res.status(500).json({ error: 'Erro ao cancelar reserva' });
   }
 });
 
-// Avaliar reserva
+/**
+ * Avaliar reserva
+ */
 router.post('/reservas/:id/avaliar', authMiddleware, async (req, res) => {
   try {
     const reservaId = parseInt(req.params.id);
@@ -254,7 +258,7 @@ router.post('/reservas/:id/avaliar', authMiddleware, async (req, res) => {
 
     res.json({ message: 'Avaliação adicionada com sucesso' });
   } catch (err) {
-    console.error(err);
+    console.error('ERRO ao avaliar reserva:', err);
     res.status(500).json({ error: 'Erro ao avaliar reserva' });
   }
 });

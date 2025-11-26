@@ -15,6 +15,10 @@ const archive = archiver('zip', {
 
 output.on('close', () => {
   console.log(`✅ Arquivo lambda.zip criado (${archive.pointer()} bytes)`);
+  console.log('📦 Arquivos incluídos:');
+  console.log('   - index.js, app.js, package.json');
+  console.log('   - routes/, middleware/, db/, utils/');
+  console.log('   - node_modules/');
 });
 
 archive.on('error', (err) => {
@@ -35,13 +39,17 @@ const filesToInclude = [
 const foldersToInclude = [
   'routes',
   'middleware',
-  'db'
+  'db',
+  'utils'  // ✅ CORRIGIDO: Pasta utils adicionada
 ];
 
 // Adiciona arquivos individuais
 filesToInclude.forEach(file => {
   if (fs.existsSync(path.join(__dirname, file))) {
     archive.file(path.join(__dirname, file), { name: file });
+    console.log(`✓ Adicionado: ${file}`);
+  } else {
+    console.warn(`⚠ Arquivo não encontrado: ${file}`);
   }
 });
 
@@ -49,10 +57,18 @@ filesToInclude.forEach(file => {
 foldersToInclude.forEach(folder => {
   if (fs.existsSync(path.join(__dirname, folder))) {
     archive.directory(path.join(__dirname, folder), folder);
+    console.log(`✓ Adicionado: ${folder}/`);
+  } else {
+    console.warn(`⚠ Pasta não encontrada: ${folder}/`);
   }
 });
 
 // Adiciona node_modules (apenas produção)
-archive.directory(path.join(__dirname, 'node_modules'), 'node_modules');
+if (fs.existsSync(path.join(__dirname, 'node_modules'))) {
+  archive.directory(path.join(__dirname, 'node_modules'), 'node_modules');
+  console.log('✓ Adicionado: node_modules/');
+} else {
+  console.error('❌ Pasta node_modules não encontrada! Execute: npm install');
+}
 
 archive.finalize();

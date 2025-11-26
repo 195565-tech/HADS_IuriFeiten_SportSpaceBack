@@ -5,12 +5,10 @@ const router = express.Router();
 
 /**
  * Rota para Criar uma nova reserva.
- * Trata o erro 500 isolando a criação da notificação.
  */
 router.post('/reservas', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    // O cliente está enviando a hora de início como 'hora' (ReservarLocal.tsx)
     const { localId, data, hora_inicio, hora_fim, status = 'ativa' } = req.body; 
 
     const local = await db('locais').where({ id: localId }).first();
@@ -25,11 +23,9 @@ router.post('/reservas', authMiddleware, async (req, res) => {
       })
       .andWhere(function() {
         this.where(function() {
-          // Verifica se o horário de início está dentro de uma reserva existente
           this.where('hora_inicio', '<=', hora_inicio)
               .andWhere('hora_fim', '>', hora_inicio);
         }).orWhere(function() {
-          // Verifica se o horário de fim está dentro de uma reserva existente
           this.where('hora_inicio', '<', hora_fim)
               .andWhere('hora_fim', '>=', hora_fim);
         });
@@ -46,7 +42,6 @@ router.post('/reservas', authMiddleware, async (req, res) => {
     const duracaoHoras = horaFim - horaInicio;
     const valorTotal = Number((local.valor_hora * duracaoHoras).toFixed(2));
 
-    // 1. Cria a Reserva (Operação Crítica)
     const result = await db('reservas').insert({
       local_id: localId, 
       user_id: userId, 
@@ -59,18 +54,14 @@ router.post('/reservas', authMiddleware, async (req, res) => {
       updated_at: now
     }).returning('id');
 
-    // Knex retorna a ID inserida, geralmente como um array de números ou objetos.
-    // Garantimos que 'id' seja o valor numérico da ID.
     const id = (result[0].id !== undefined) ? result[0].id : result[0];
-    
     const newReserva = await db('reservas').where({ id }).first();
     
-    // 2. Gerar notificações para o usuário e admin (Operação Não-Crítica - Isolada)
+    // Gerar notificações (isolado)
     const localNome = local.nome || 'Local Desconhecido';
     const mensagemBase = `Reserva criada para ${localNome} em ${data} às ${hora_inicio}`;
     
     try {
-      // Notificação para o usuário que fez a reserva
       await db('notificacoes').insert({
         user_id: userId,
         tipo: 'reserva_criada',
@@ -78,7 +69,6 @@ router.post('/reservas', authMiddleware, async (req, res) => {
         created_at: now
       });
 
-      // Notificação para o admin do local
       if (local.user_id) {
         await db('notificacoes').insert({
           user_id: local.user_id,
@@ -88,33 +78,67 @@ router.post('/reservas', authMiddleware, async (req, res) => {
         });
       }
     } catch (notificationError) {
-      console.error('ERRO AO CRIAR NOTIFICAÇÃO (ignorado para sucesso da reserva):', notificationError);
+      console.error('ERRO AO CRIAR NOTIFICAÇÃO (ignorado):', notificationError);
     }
     
-    // 3. Envia a resposta de sucesso
     res.status(201).json(newReserva);
   } catch (err) {
-    // Captura erros críticos (como falha na inserção da reserva ou validação)
     console.error('ERRO CRÍTICO AO CRIAR RESERVA:', err);
     res.status(500).json({ error: 'Erro ao criar reserva' });
   }
 });
 
-// Listar reservas do usuário
+/**
+ * ✅ ROTA CORRIGIDA: Listar reservas
+ * - Admin: vê TODAS as reservas
+ * - Owner: vê apenas reservas dos seus locais
+ * - User comum: vê apenas suas próprias reservas
+ */
 router.get('/reservas', authMiddleware, async (req, res) => {
   try {
-    // 1. Modifica a consulta para usar JOIN
-    const reservas = await db('reservas')
-      .where('reservas.user_id', req.user.user_id) // Garante que estamos filtrando pelo user_id correto
-      .join('locais', 'reservas.local_id', '=', 'locais.id') // Faz o JOIN com a tabela 'locais'
+    const { locais_ids } = req.query;
+    const userType = req.user.user_type;
+    const userId = req.user.user_id;
+
+    let query = db('reservas')
+      .join('locais', 'reservas.local_id', '=', 'locais.id')
+      .leftJoin('users', 'reservas.user_id', '=', 'users.user_id')
       .select(
-        'reservas.*', // Seleciona todos os campos da reserva
-        'locais.nome as local_nome', // Adiciona o nome do local
-        'locais.endereco as local_endereco', // Adiciona o endereço do local
-        'locais.esporte as local_esporte' // Adiciona o esporte do local
-      )
-      .orderBy('data_reserva', 'desc');
-      
+        'reservas.*',
+        'locais.nome as local_nome',
+        'locais.endereco as local_endereco',
+        'locais.esporte as local_esporte',
+        'users.nome as nome_usuario'
+      );
+
+    // ✅ Filtro baseado no tipo de usuário
+    if (userType === 'admin') {
+      // Admin vê TODAS as reservas (sem filtro)
+    } else if (userType === 'owner') {
+      // Owner vê apenas reservas dos seus locais
+      if (locais_ids) {
+        // Se veio query param, filtra pelos IDs específicos
+        const ids = locais_ids.split(',').map(id => parseInt(id));
+        query = query.whereIn('reservas.local_id', ids);
+      } else {
+        // Se não veio query param, busca todos os locais do owner
+        const meusLocais = await db('locais')
+          .where({ user_id: userId })
+          .select('id');
+        const meusLocaisIds = meusLocais.map(l => l.id);
+        
+        if (meusLocaisIds.length === 0) {
+          return res.json([]); // Owner sem locais = sem reservas
+        }
+        
+        query = query.whereIn('reservas.local_id', meusLocaisIds);
+      }
+    } else {
+      // User comum vê apenas suas próprias reservas
+      query = query.where('reservas.user_id', userId);
+    }
+
+    const reservas = await query.orderBy('reservas.data_reserva', 'desc');
     res.json(reservas);
   } catch (err) {
     console.error(err);
@@ -138,13 +162,11 @@ router.put('/reservas/:id', authMiddleware, async (req, res) => {
     await db('reservas').where({ id: reservaId }).update(updateData);
     const updatedReserva = await db('reservas').where({ id: reservaId }).first();
 
-    // Se houve mudança de status, gera notificações
     if (updateData.status && updateData.status !== statusAnterior) {
       const local = await db('locais').where({ id: reserva.local_id }).first();
       const localNome = local?.nome || `Local ID: ${reserva.local_id}`;
       const mensagemBase = `Status da reserva alterado para "${updateData.status}" - ${localNome} em ${reserva.data_reserva} às ${reserva.hora_inicio}`;
 
-      // Notificação para o usuário da reserva
       await db('notificacoes').insert({
         user_id: req.user.user_id,
         tipo: 'reserva_atualizada',
@@ -152,7 +174,6 @@ router.put('/reservas/:id', authMiddleware, async (req, res) => {
         created_at: now
       });
 
-      // Notificação para o admin do local
       if (local?.user_id) {
         await db('notificacoes').insert({
           user_id: local.user_id,
@@ -179,7 +200,6 @@ router.delete('/reservas/:id', authMiddleware, async (req, res) => {
     const reserva = await db('reservas').where({ id: reservaId, user_id: req.user.user_id }).first();
     if (!reserva) return res.status(404).json({ error: 'Reserva não encontrada' });
 
-    // Guarda o status anterior para comparação
     const statusAnterior = reserva.status;
     const now = new Date().toISOString();
 
@@ -188,14 +208,11 @@ router.delete('/reservas/:id', authMiddleware, async (req, res) => {
       updated_at: now 
     });
     
-    // Se o status mudou, gera notificações
     if (statusAnterior !== 'cancelada') {
-      // Busca o local para obter informações e o admin
       const local = await db('locais').where({ id: reserva.local_id }).first();
       const localNome = local?.nome || `Local ID: ${reserva.local_id}`;
       const mensagemBase = `Reserva cancelada para ${localNome} em ${reserva.data_reserva} às ${reserva.hora_inicio}`;
 
-      // Notificação para o usuário que fez a reserva
       await db('notificacoes').insert({
         user_id: req.user.user_id,
         tipo: 'reserva_cancelada',
@@ -203,7 +220,6 @@ router.delete('/reservas/:id', authMiddleware, async (req, res) => {
         created_at: now
       });
 
-      // Notificação para o admin do local
       if (local?.user_id) {
         await db('notificacoes').insert({
           user_id: local.user_id,

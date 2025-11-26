@@ -10,21 +10,21 @@ const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
-// ✅ CORS configurado corretamente para produção
+// ✅ CORS com a URL CORRETA do Amplify
 app.use(cors({
   origin: [
-    'https://main.dlm5jb4lw8ys1.amplifyapp.com',
+    'https://main.dd96lrvrtfaq0.amplifyapp.com', // ✅ URL CORRIGIDA
+    'https://main.dlm5jb4lw8ys1.amplifyapp.com', // Mantém a antiga por segurança
     'http://localhost:5173',
     'http://localhost:3000'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // ✅ ADICIONADO
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // ✅ ADICIONADO
-  exposedHeaders: ['Content-Range', 'X-Content-Range'], // ✅ ADICIONADO
-  maxAge: 86400 // Cache preflight por 24h
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400
 }));
 
-// ✅ Middleware OPTIONS para preflight requests
 app.options('*', cors());
 
 app.use(express.json());

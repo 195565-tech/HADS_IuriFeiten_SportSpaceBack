@@ -102,13 +102,13 @@ router.get('/reservas', authMiddleware, async (req, res) => {
 
     let query = db('reservas')
       .join('locais', 'reservas.local_id', '=', 'locais.id')
-      .leftJoin('users', 'reservas.user_id', '=', 'users.user_id')
+      .leftJoin('user_profiles', 'reservas.user_id', '=', 'user_profiles.user_id')
       .select(
         'reservas.*',
         'locais.nome as local_nome',
         'locais.endereco as local_endereco',
         'locais.esporte as local_esporte',
-        'users.nome as nome_usuario'
+        'user_profiles.nome as nome_usuario'
       );
 
     // ✅ Filtro baseado no tipo de usuário

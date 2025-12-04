@@ -1,3 +1,4 @@
+//Crud de notificações
 const express = require('express');
 const db = require('../db/knex');
 const authMiddleware = require('../middleware/auth');

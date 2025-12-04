@@ -1,3 +1,4 @@
+//Arquivo de config do knex
 require('dotenv').config();
 
 module.exports = {

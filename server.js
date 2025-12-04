@@ -1,3 +1,4 @@
+//inicia a aplicação quando rodado localmente
 require('dotenv').config();
 const app = require('./app');
 const db = require('./db/knex');

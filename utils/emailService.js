@@ -1,3 +1,4 @@
+//Serviço de envio de e-mail para recuperação de senha
 // backend/utils/emailService.js
 const nodemailer = require("nodemailer");
 

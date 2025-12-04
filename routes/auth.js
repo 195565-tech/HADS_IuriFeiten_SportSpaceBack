@@ -1,3 +1,4 @@
+//gera token para login, tudo que envolve autenticação de usuário passa por aqui
 // backend/routes/auth.js
 const { sendPasswordResetEmail } = require("../utils/emailService");
 const express = require("express");

@@ -1,3 +1,4 @@
+//retorna dados de identificação de usuário
 const express = require('express');
 const db = require('../db/knex');
 const authMiddleware = require('../middleware/auth');

@@ -1,3 +1,4 @@
+//Usado para rodar localmente
 require('dotenv').config();
 const app = require('./app');
 

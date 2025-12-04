@@ -1,3 +1,4 @@
+//Tudo que envolve crud de local
 const express = require('express');
 const db = require('../db/knex');
 const authMiddleware = require('../middleware/auth');

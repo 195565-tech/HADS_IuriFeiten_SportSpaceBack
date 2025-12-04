@@ -1,3 +1,4 @@
+//select nativo, sem ORM
 const knex = require('knex');
 const config = require('../knexfile');
 

@@ -1,3 +1,4 @@
+// valida tokens do front
 const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
